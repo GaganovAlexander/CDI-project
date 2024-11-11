@@ -2,3 +2,4 @@
 *.json
 venv/
 *.pdf
+.DS_Store
