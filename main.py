@@ -10,13 +10,13 @@ from elastic import add_doc, process_query
 from parse_pdf import parse_pdf_to_paragraphs
 from configs import WORKING_DIR
 
+
 app = Flask(__name__)
 
 UPLOAD_FOLDER = 'pdfs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
-
 
 
 @app.route('/upload', methods=['POST'])
@@ -81,12 +81,12 @@ def upload_pdf():
 @app.route('/progress/<task_id>', methods=['GET'])
 def get_progress(task_id):
     progress_file_path = os.path.join(WORKING_DIR, 'tmp', f"{task_id}.json")
-
+    
     if not os.path.exists(progress_file_path):
         with open(os.path.join(WORKING_DIR, 'tmp', 'last_task'), 'r') as f:
             last_task_id = int(f.readline())
-        if int(task_id) < last_task_id:
-            return jsonify(json.dumps({'pdf_parsing_progress': 100, 'adding_doc_to_elastic_progress': 100})), 200
+        if int(task_id) <= last_task_id:
+            return jsonify({'pdf_parsing_progress': 100, 'adding_doc_to_elastic_progress': 100}), 200
         return jsonify({"error": "Task not found or not started yet"}), 404
     
     with open(progress_file_path, 'r', encoding='utf-8') as progress_file:
