@@ -3,7 +3,7 @@ import json
 from elasticsearch import Elasticsearch
 
 from configs import ELASTIC_URL, ELASTIC_USER, ELASTIC_PASSWORD
-from preprocessing_text import lemmatize_text, preprocess_text
+from preprocessing_text import preprocess_text
 
 
 es = Elasticsearch(
@@ -50,7 +50,6 @@ def add_doc(doc_path: str):
     total_docs = len(documents)
     
     for i, doc in enumerate(documents):
-        doc["lemmatized_text"] = lemmatize_text(doc['text'])
         es.index(index=index_name, document=doc)
         
         yield int((i + 1) / total_docs * 100)

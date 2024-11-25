@@ -39,7 +39,7 @@ def upload_pdf():
         file.save(pdf_filepath)
     elif file_url:
         try:
-            response = requests.get(file_url)
+            response = requests.get(file_url, timeout=60, verify=False)
             response.raise_for_status()
             filename = file_url.split("/")[-1]
             pdf_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)

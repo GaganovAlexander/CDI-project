@@ -4,6 +4,7 @@ from os import path
 import fitz
 
 from configs import WORKING_DIR
+from preprocessing_text import lemmatize_text
 
 
 def parse_pdf_to_paragraphs(file_path: str):
@@ -33,11 +34,13 @@ def parse_pdf_to_paragraphs(file_path: str):
                     previous_indent = current_indent
 
                 if current_indent > previous_indent and current_paragraph:
+                    text_ = " ".join(current_paragraph)
                     result.append({
                         "document_name": document_name,
                         "page_number": page_number + 1,
                         "paragraph_number": paragraph_number,
-                        "text": " ".join(current_paragraph),
+                        "text": text_,
+                        "lemmatized_text": lemmatize_text(text_),
                         "bbox": paragraph_bbox
                     })
                     paragraph_number += 1
@@ -57,11 +60,13 @@ def parse_pdf_to_paragraphs(file_path: str):
                 previous_indent = current_indent
 
             if current_paragraph:
+                text_ = " ".join(current_paragraph)
                 result.append({
                     "document_name": document_name,
                     "page_number": page_number + 1,
                     "paragraph_number": paragraph_number,
-                    "text": " ".join(current_paragraph),
+                    "text": text_,
+                    "lemmatized_text": lemmatize_text(text_),
                     "bbox": paragraph_bbox  
                 })
             yield int((page_number + 1) / pdf_document.page_count * 100)
