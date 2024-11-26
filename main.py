@@ -1,10 +1,11 @@
-from flask import Flask, request, jsonify
-from werkzeug.utils import secure_filename
-
 import os
 import requests
 import json
 from threading import Thread
+
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
 from elastic import add_doc, process_query
 from parse_pdf import parse_pdf_to_paragraphs
@@ -12,6 +13,7 @@ from configs import WORKING_DIR
 
 
 app = Flask(__name__)
+CORS(app)
 
 UPLOAD_FOLDER = 'pdfs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
