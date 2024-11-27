@@ -1,8 +1,8 @@
 import os
-import requests
 import json
 from threading import Thread
 
+import aiohttp
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -22,7 +22,7 @@ app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 
 
 @app.route('/upload', methods=['POST'])
-def upload_pdf():
+async def upload_pdf():
     file = request.files.get('file')
     file_url = request.form.get('file_url')
 
@@ -41,14 +41,15 @@ def upload_pdf():
         file.save(pdf_filepath)
     elif file_url:
         try:
-            response = requests.get(file_url, timeout=60, verify=False)
-            response.raise_for_status()
-            filename = file_url.split("/")[-1]
-            pdf_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-            with open(pdf_filepath, 'wb') as f:
-                f.write(response.content)
-        except requests.exceptions.RequestException as e:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(file_url, timeout=60) as response:
+                    response.raise_for_status()
+                    filename = file_url.split("/")[-1]
+                    pdf_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    
+                    with open(pdf_filepath, 'wb') as f:
+                        f.write(await response.read())
+        except aiohttp.ClientError as e:
             return jsonify({"error": f"Failed to download the file: {str(e)}"}), 400
 
     with open(os.path.join(WORKING_DIR, 'tmp', 'last_task'), 'r') as f:
