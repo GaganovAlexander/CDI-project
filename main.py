@@ -1,6 +1,7 @@
 import os
 import json
 from threading import Thread
+import asyncio
 
 import aiohttp
 from flask import Flask, request, jsonify
@@ -49,6 +50,8 @@ async def upload_pdf():
                     
                     with open(pdf_filepath, 'wb') as f:
                         f.write(await response.read())
+        except asyncio.TimeoutError:
+            return jsonify({"error": f"File download attempt timeout"}), 400
         except aiohttp.ClientError as e:
             return jsonify({"error": f"Failed to download the file: {str(e)}"}), 400
 
