@@ -48,6 +48,7 @@ pymorphy3-dicts-ru==2.4.417150.4580142
 PyMuPDF==1.24.13
 pyspellchecker==0.8.1
 python-dotenv==1.0.1
+redis==5.2.0
 requests==2.32.3
 rich==13.9.4
 ru_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/ru_core_news_sm-3.8.0/ru_core_news_sm-3.8.0-py3-none-any.whl#sha256=69978d47b43e2c4f329bebdb155e8e9d3861bba1a58ba25551419dae7d7e07fc

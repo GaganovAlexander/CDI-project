@@ -44,9 +44,7 @@ mappings = {
 if not es.indices.exists(index=index_name):
     es.indices.create(index=index_name, body=mappings)
 
-def add_doc(doc_path: str):
-    with open(doc_path, 'r', encoding='utf-8') as f:
-        documents = json.load(f)
+def add_doc(documents):
     total_docs = len(documents)
     
     for i, doc in enumerate(documents):

@@ -1,9 +1,5 @@
-import json
-from os import path
-
 import fitz
 
-from configs import WORKING_DIR
 from preprocessing_text import lemmatize_text
 
 
@@ -71,7 +67,4 @@ def parse_pdf_to_paragraphs(file_path: str):
                 })
             yield int((page_number + 1) / pdf_document.page_count * 100)
 
-    json_filepath = path.join(WORKING_DIR, 'jsons', path.splitext(document_name)[0] + '.json')
-    with open(json_filepath, 'w', encoding='utf-8') as f:
-        json.dump(result, f, ensure_ascii=False, indent=4)
-    yield json_filepath
+    yield result
