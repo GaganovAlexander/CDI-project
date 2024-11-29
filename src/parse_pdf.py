@@ -1,6 +1,6 @@
 import fitz
 
-from preprocessing_text import lemmatize_text
+from .preprocessing_text import lemmatize_text
 
 
 def parse_pdf_to_paragraphs(file_path: str):

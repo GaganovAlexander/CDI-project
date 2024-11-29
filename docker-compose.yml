@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  cdi-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cdi-app
+    ports:
+      - "${APP_PORT}:5000"
+    volumes:
+      - .:/app
+      - logs:/app/logs
+      - "${PDFS_DIR}:/app/pdfs"
+    environment:
+      - FLASK_ENV=development
+    env_file:
+      - .env
+    depends_on:
+      - elasticsearch
+      - redis
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.2
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    ports:
+      - "${ELASTIC_PORT}:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  redis:
+    image: redis
+    container_name: redis
+    ports:
+      - "${REDIS_PORT}:6379"
+
+volumes:
+  es_data:
+  logs:

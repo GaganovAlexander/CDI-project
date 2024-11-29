@@ -1,9 +1,9 @@
-import json
+import time
 
 from elasticsearch import Elasticsearch
 
-from configs import ELASTIC_URL, ELASTIC_USER, ELASTIC_PASSWORD
-from preprocessing_text import preprocess_text
+from .configs import ELASTIC_URL, ELASTIC_USER, ELASTIC_PASSWORD
+from .preprocessing_text import preprocess_text
 
 
 es = Elasticsearch(
@@ -11,8 +11,16 @@ es = Elasticsearch(
     basic_auth=(ELASTIC_USER, ELASTIC_PASSWORD),
     verify_certs=True
 )
-if not es.ping():
-    raise Exception("Не удалось подключиться к Elasticsearch.")
+
+max_retries = 10
+for _ in range(max_retries):
+    if es.ping():
+        print("Подключение к Elasticsearch успешно.")
+        break
+    print("Не удалось подключиться к Elasticsearch. Ожидание...")
+    time.sleep(5)
+else:
+    raise Exception("Не удалось подключиться к Elasticsearch после нескольких попыток.")
 
 
 index_name = "documents"

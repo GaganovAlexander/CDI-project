@@ -1,6 +1,4 @@
 .env
-last_task
-*.json
 venv/
 *.pdf
 .DS_Store

@@ -9,8 +9,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
-from elastic import add_doc, process_query
-from parse_pdf import parse_pdf_to_paragraphs
+from .configs import REDIS_PORT
+from .elastic import add_doc, process_query
+from .parse_pdf import parse_pdf_to_paragraphs
 
 
 app = Flask(__name__)
@@ -21,7 +22,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
 
-redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
+redis_client = redis.Redis(host='redis', port=REDIS_PORT, decode_responses=True)
 
 
 @app.route('/upload', methods=['POST'])
@@ -94,13 +95,13 @@ async def upload_pdf():
 @app.route('/progress/<task_id>', methods=['GET'])
 def get_progress(task_id):
     progress_data = redis_client.get(f"task:{task_id}:progress")
-    if not progress_data:
-        last_task_id = int(redis_client.get("last_task_id") or 0)
-        if int(task_id) <= last_task_id:
-            return jsonify({'pdf_parsing_progress': 100, 'adding_doc_to_elastic_progress': 100}), 200
-        return jsonify({"error": "Task not found or not started yet"}), 404
+    if progress_data:
+        return jsonify(json.loads(progress_data))
     
-    return jsonify(json.loads(progress_data))
+    last_task_id = int(redis_client.get("last_task_id") or 0)
+    if int(task_id) <= last_task_id:
+        return jsonify({'pdf_parsing_progress': 100, 'adding_doc_to_elastic_progress': 100}), 200
+    return jsonify({"error": "Task not found or not started yet"}), 404
 
 
 @app.route('/search', methods=['POST'])
@@ -111,7 +112,6 @@ def search():
         return jsonify({"error": "No query provided"}), 400
     
     results = process_query(user_query)
-    
     return jsonify({"results": results}), 200
 
 
