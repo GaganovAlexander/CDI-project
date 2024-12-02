@@ -1,29 +1,52 @@
 #!/bin/bash
 
-ask_for_value() {
+ask_for_port() {
   local prompt=$1
   local default_value=$2
-  echo "$prompt (default: $default_value): " > /dev/tty
-  read input
-  echo ${input:-$default_value}
+  local value
+
+  while true; do
+    echo "$prompt (default: $default_value): " > /dev/tty
+    read value
+    value=${value:-$default_value}
+
+    if [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+      echo "$value"
+      break
+    fi
+    echo "Invalid input. Please enter a valid number (port must be positive integer number and cannot start with 0)." > /dev/tty
+  done
 }
 
-ELASTIC_PORT=$(ask_for_value "Enter the port for Elasticsearch" "9200")
-REDIS_PORT=$(ask_for_value "Enter the port for Redis" "6379")
-APP_PORT=$(ask_for_value "Enter the port for the Flask application" "5000")
+ELASTIC_PORT=$(ask_for_port "Enter the port for Elasticsearch" "9200")
+REDIS_PORT=$(ask_for_port "Enter the port for Redis" "6379")
+APP_PORT=$(ask_for_port "Enter the port for the Flask application" "5000")
 
 echo "Received values:"
 echo "Elasticsearch port: $ELASTIC_PORT"
 echo "Redis port: $REDIS_PORT"
 echo "App port: $APP_PORT"
 
-echo "Enter the Elasticsearch superuser password: "
-read -s ELASTIC_PASSWORD
-echo
+while true; do
+  echo "Enter the Elasticsearch superuser password: "
+  read -s ELASTIC_PASSWORD
+  echo
 
-echo "Enter full path to directory(on host) where pdf files will be stored: "
-read PDFS_DIR
-echo
+  if [[ ${#ELASTIC_PASSWORD} -lt 8 ]]; then
+    echo "Password must be at least 8 characters long. Please try again."
+    continue
+  fi
+
+  echo "Confirm the password: "
+  read -s ELASTIC_PASSWORD_CONFIRM
+  echo
+
+  if [[ "$ELASTIC_PASSWORD" != "$ELASTIC_PASSWORD_CONFIRM" ]]; then
+    echo "Passwords do not match. Please try again."
+  else
+    break
+  fi
+done
 
 cat > .env <<EOL
 APP_PORT=$APP_PORT
@@ -35,13 +58,7 @@ ELASTIC_PORT=$ELASTIC_PORT
 
 REDIS_PORT=$REDIS_PORT
 
-PDFS_DIR=$PDFS_DIR
+PDFS_DIR=$(pwd)/pdfs
 EOL
 
 echo ".env file has been created."
-
-export $(grep -v '^#' .env | xargs)
-
-echo "Environment variables have been set."
-
-echo "Now you can run 'docker-compose up -d' to start the services."

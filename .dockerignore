@@ -1,9 +1,8 @@
-.env
 venv/
 *.pdf
 .DS_Store
 __pycache__
 README.md
 setup.sh
-Dockerfile
-docker-compose.yml
+LICENSE
+.gitignore
