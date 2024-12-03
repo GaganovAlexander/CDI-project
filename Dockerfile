@@ -15,4 +15,4 @@ COPY ./src /app
 
 WORKDIR /app
 
-CMD ["hypercorn", "--bind", "0.0.0.0:5000", "src.main:app", "--access-logfile", "/app/logs/access.log", "--error-logfile", "/app/logs/error.log"]
+CMD ["hypercorn", "--bind", "0.0.0.0:5000", "--access-logfile", "-", "--error-logfile", "-", "src.main:app"]

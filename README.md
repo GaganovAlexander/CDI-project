@@ -50,21 +50,22 @@ source ./setup.sh
 
 ## 3. Запуск приложения с использованием Docker Compose
 После того как .env файл будет создан, вы можете запустить приложение с помощью Docker Compose.
+
 Соберите образы:
 ```bash
-docker-compose build
+docker compose build
 ```
 Запустите контейнеры:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 Чтобы проверить статус контейнеров, используйте:
 ```bash
-docker-compose ps
+docker compose ps
 ```
 Если вам нужно остановить контейнеры:
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ## Настройка Nginx
