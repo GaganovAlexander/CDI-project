@@ -5,6 +5,7 @@ from .elastic import wait_for_elastic, create_index, process_query
 from .configs import UPLOAD_FOLDER, MAX_CONTENT_LENGTH
 from .redis import get_task_progress
 from .files_processing import process_file, process_file_url
+from .utils import cache_response
 
 import os
 
@@ -53,6 +54,7 @@ async def get_progress(task_id):
     return jsonify(progress), 200
 
 @app.route("/search", methods=["POST"])
+@cache_response()
 async def search():
     data = await request.json
     user_query = data.get("query")

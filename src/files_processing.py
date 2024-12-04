@@ -3,7 +3,6 @@ from hashlib import md5
 import asyncio
 import aiofiles
 
-from werkzeug.datastructures import FileStorage
 from quart import jsonify
 import aiohttp
 
@@ -13,29 +12,33 @@ from .parse_pdf import parse_pdf_to_paragraphs
 from .elastic import add_doc
 
 
-async def process_file(file: FileStorage):
-    if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
-
-    if not file or not file.filename.endswith('.pdf'):
-        return jsonify({"error": "Invalid file format, only PDF allowed"}), 400
-
-    md5_hash = md5()
-    file_chunks = []
-    for chunk in file.stream:
-        md5_hash.update(chunk)
-        file_chunks.append(chunk)
+async def is_file_already_uploaded(file, filename):
+    md5_hash = md5(file)
     file_hash = md5_hash.hexdigest()
 
-    filename_redis = await check_file(file_hash, file.filename)
+    filename_redis = await check_file(file_hash, filename)
     if filename_redis is not None: 
-         return jsonify({"error": f"File has already been uploaded with name: {filename_redis}"}), 409
+        return jsonify({"error": "File has already been uploaded"}), 409
+    return None
+
+async def process_file(file):
+    filename = file.filename
+    if filename == '':
+            return jsonify({"error": "No selected file"}), 400
+
+    if not file or not filename.endswith('.pdf'):
+        return jsonify({"error": "Invalid file format, only PDF allowed"}), 400
+
+    file_data = file.read()
+
+    uloaded = await is_file_already_uploaded(file_data, filename)
+    if uloaded is not None: 
+        return uloaded
     
-    pdf_filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+    pdf_filepath = os.path.join(UPLOAD_FOLDER, filename)
 
     async with aiofiles.open(pdf_filepath, 'wb') as f:
-        for chunk in file_chunks:
-            await f.write(chunk)
+        await f.write(file_data)
 
     task_id = await get_last_task_id(increment=True)
     asyncio.create_task(parse_pdf(task_id, pdf_filepath))
@@ -49,10 +52,20 @@ async def process_file_url(file_url: str):
             async with session.get(file_url, timeout=60) as response:
                 response.raise_for_status()
                 filename = file_url.split("/")[-1]
+
+                if not filename.endswith('.pdf'):
+                    return jsonify({"error": "Invalid file format, only PDF allowed"}), 400
+                
+                file_data = await response.read()
+
+                uloaded = await is_file_already_uploaded(file_data, filename)
+                if uloaded is not None: 
+                    return uloaded
+                
                 pdf_filepath = os.path.join(UPLOAD_FOLDER, filename)
                 
                 async with aiofiles.open(pdf_filepath, 'wb') as f:
-                    await f.write(await response.read())
+                    await f.write(file_data)
     except asyncio.TimeoutError:
         return jsonify({"error": f"File download attempt timeout"}), 400
     except aiohttp.ClientError as e:
