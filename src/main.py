@@ -1,34 +1,33 @@
+from quart import Quart, jsonify, request
+from quart_cors import cors
+
+from .elastic import wait_for_elastic, create_index, process_query
+from .configs import UPLOAD_FOLDER, MAX_CONTENT_LENGTH
+from .redis import get_task_progress
+from .files_processing import process_file, process_file_url
+
 import os
-import json
-from threading import Thread
-import asyncio
-import redis
-
-import aiohttp
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from werkzeug.utils import secure_filename
-
-from .configs import REDIS_PORT
-from .elastic import add_doc, process_query
-from .parse_pdf import parse_pdf_to_paragraphs
 
 
-app = Flask(__name__)
-CORS(app)
+app = Quart(__name__)
+cors(app)
 
-UPLOAD_FOLDER = 'pdfs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
-
-redis_client = redis.Redis(host='redis', port=REDIS_PORT, decode_responses=True)
+app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
 
-@app.route('/upload', methods=['POST'])
+@app.before_serving
+async def on_startup():
+    await wait_for_elastic()
+    await create_index()
+
+
+@app.route("/upload", methods=["POST"])
 async def upload_pdf():
-    file = request.files.get('file')
-    file_url = request.form.get('file_url')
+    files = await request.files
+    file = files.get("file")
+    form = await request.form
+    file_url = form.get("file_url")
 
     if not file and not file_url:
         return jsonify({"error": "No file or file URL provided"}), 400
@@ -39,81 +38,30 @@ async def upload_pdf():
         
         if not file or not file.filename.endswith('.pdf'):
             return jsonify({"error": "Invalid file format, only PDF allowed"}), 400
+        
+        return await process_file(file)
 
-        filename = secure_filename(file.filename)
-        pdf_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(pdf_filepath)
     elif file_url:
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(file_url, timeout=60) as response:
-                    response.raise_for_status()
-                    filename = file_url.split("/")[-1]
-                    pdf_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                    
-                    with open(pdf_filepath, 'wb') as f:
-                        f.write(await response.read())
-        except asyncio.TimeoutError:
-            return jsonify({"error": f"File download attempt timeout"}), 400
-        except aiohttp.ClientError as e:
-            return jsonify({"error": f"Failed to download the file: {str(e)}"}), 400
-
-    task_id = redis_client.incr("last_task_id")
-    redis_client.set(f"task:{task_id}:progress", json.dumps({
-        'pdf_parsing_progress': 0,
-        'adding_doc_to_elastic_progress': 0
-    }))
-
-    def generate_progress():
-        parse_pdf_gen = parse_pdf_to_paragraphs(pdf_filepath)
-        for pdf_parsing_progress in parse_pdf_gen:
-            redis_client.set(f"task:{task_id}:progress", json.dumps({
-                'pdf_parsing_progress': pdf_parsing_progress,
-                'adding_doc_to_elastic_progress': 0
-            }))
-
-            if pdf_parsing_progress == 100: break
-        documents = next(parse_pdf_gen)
-
-        last_adding_doc_to_elastic_progress = 0
-        for adding_doc_to_elastic_progress in add_doc(documents):
-            if adding_doc_to_elastic_progress == last_adding_doc_to_elastic_progress:
-                continue
-
-            redis_client.set(f"task:{task_id}:progress", json.dumps({
-                'pdf_parsing_progress': 100,
-                'adding_doc_to_elastic_progress': adding_doc_to_elastic_progress
-            }))
-        redis_client.delete(f"task:{task_id}:progress")
-    
-    thread = Thread(target=generate_progress)
-    thread.start()
-
-    return jsonify({"message": "File uploaded successfully, processing started", "task_id": task_id}), 200
+        return await process_file_url(file_url)
 
 
-@app.route('/progress/<task_id>', methods=['GET'])
-def get_progress(task_id):
-    progress_data = redis_client.get(f"task:{task_id}:progress")
-    if progress_data:
-        return jsonify(json.loads(progress_data))
-    
-    last_task_id = int(redis_client.get("last_task_id") or 0)
-    if int(task_id) <= last_task_id:
-        return jsonify({'pdf_parsing_progress': 100, 'adding_doc_to_elastic_progress': 100}), 200
-    return jsonify({"error": "Task not found or not started yet"}), 404
+@app.route("/progress/<int:task_id>", methods=["GET"])
+async def get_progress(task_id):
+    progress = await get_task_progress(task_id)
+    if progress is None:
+        return jsonify({"error": "Task not found or not started yet"}), 404
+    return jsonify(progress), 200
 
-
-@app.route('/search', methods=['POST'])
-def search():
-    user_query = request.json.get('query')
+@app.route("/search", methods=["POST"])
+async def search():
+    data = await request.json
+    user_query = data.get("query")
     
     if not (user_query):
         return jsonify({"error": "No query provided"}), 400
     
-    results = process_query(user_query)
+    results = await process_query(user_query)
     return jsonify({"results": results}), 200
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)

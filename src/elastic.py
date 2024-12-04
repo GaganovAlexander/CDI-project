@@ -1,84 +1,66 @@
-import time
+import asyncio
 
-from elasticsearch import Elasticsearch
+from elasticsearch import AsyncElasticsearch
 
-from .configs import ELASTIC_URL, ELASTIC_USER, ELASTIC_PASSWORD
+from .configs import ELASTIC_URL, ELASTIC_USER, ELASTIC_PASSWORD, INDEX_NAME, MAPPINGS
 from .preprocessing_text import preprocess_text
 
 
-es = Elasticsearch(
+es = AsyncElasticsearch(
     ELASTIC_URL,
     basic_auth=(ELASTIC_USER, ELASTIC_PASSWORD),
     verify_certs=True
 )
 
-max_retries = 10
-for _ in range(max_retries):
-    if es.ping():
-        print("Подключение к Elasticsearch успешно.")
-        break
-    print("Не удалось подключиться к Elasticsearch. Ожидание...")
-    time.sleep(5)
-else:
-    raise Exception("Не удалось подключиться к Elasticsearch после нескольких попыток.")
+async def wait_for_elastic(tries = 10) -> None:
+    for _ in range(tries):
+        try:
+            if await es.ping():
+                print("Elasticsearch is ready.")
+                return
+        except ConnectionError:
+            pass
+        print("Waiting for Elasticsearch...")
+        await asyncio.sleep(5)
+    raise TimeoutError("Elasticsearch did not become ready in time.")
 
+async def create_index() -> None:
+    exists = await es.indices.exists(index=INDEX_NAME)
+    if not exists:
+        response = await es.indices.create(index=INDEX_NAME, body=MAPPINGS)
+        print(f"Index created: {response}")
+    else:
+        print(f"Index '{INDEX_NAME}' already exists.")
 
-index_name = "documents"
-mappings = {
-    "mappings": {
-        "properties": {
-            "document_name": {
-                "type": "text"
-            },
-            "page_number": {
-                "type": "integer"
-            },
-            "paragraph_number": {
-                "type": "integer"
-            },
-            "text": {
-                "type": "text"
-            },
-            "lemmatized_text": {
-                "type": "text"
-            },
-            "bbox": {
-                "type": "float"
-            }
-        }
-    }
-}
-
-if not es.indices.exists(index=index_name):
-    es.indices.create(index=index_name, body=mappings)
-
-def add_doc(documents):
+async def add_doc(documents):
     total_docs = len(documents)
-    
+
     for i, doc in enumerate(documents):
-        es.index(index=index_name, document=doc)
-        
+        await es.index(index=INDEX_NAME, document=doc)
         yield int((i + 1) / total_docs * 100)
 
 
-def process_query(user_query: str):
+async def process_query(user_query: str) -> list[dict]:
     query = {
         "query": {
             "match": {
                 "lemmatized_text": {
-                    "query": preprocess_text(user_query),
+                    "query": await preprocess_text(user_query),
                     "minimum_should_match": "80%"
-                } 
+                }
             }
         }
     }
-    response = es.search(index=index_name, body=query)
+    response = await es.search(index=INDEX_NAME, body=query)
 
-    return [{
-            'score': hit['_score'],
-            'document_name': hit['_source']['document_name'],
-            'page_number': hit['_source']['page_number'],
-            'paragraph_number': hit['_source']['paragraph_number'],
-            'bbox': hit['_source']['bbox'],
-            'text': hit['_source']['text']
-        } for hit in response['hits']['hits']]
+    return [
+        {
+            "score": hit["_score"],
+            "document_name": hit["_source"]["document_name"],
+            "page_number": hit["_source"]["page_number"],
+            "paragraph_number": hit["_source"]["paragraph_number"],
+            "bbox": hit["_source"]["bbox"],
+            "text": hit["_source"]["text"]
+        }
+        for hit in response["hits"]["hits"]
+    ]
