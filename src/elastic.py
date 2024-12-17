@@ -17,12 +17,13 @@ async def wait_for_elastic(tries = 10) -> None:
         try:
             if await es.ping():
                 print("Elasticsearch is ready.")
-                return
+                break
         except ConnectionError:
             pass
         print("Waiting for Elasticsearch...")
         await asyncio.sleep(5)
-    raise TimeoutError("Elasticsearch did not become ready in time.")
+    else:
+        raise TimeoutError("Elasticsearch did not become ready in time.")
 
 async def create_index() -> None:
     exists = await es.indices.exists(index=INDEX_NAME)

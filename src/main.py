@@ -3,7 +3,7 @@ from quart_cors import cors
 
 from .elastic import wait_for_elastic, create_index, process_query
 from .configs import UPLOAD_FOLDER, MAX_CONTENT_LENGTH
-from .redis import get_task_progress
+from .redis import get_task_progress, close_connection
 from .files_processing import process_file, process_file_url
 from .utils import cache_response
 
@@ -23,7 +23,7 @@ async def on_startup():
     await create_index()
 
 
-@app.route("/upload", methods=["POST"])
+@app.route("/api/upload", methods=["POST"])
 async def upload_pdf():
     files = await request.files
     file = files.get("file")
@@ -34,26 +34,21 @@ async def upload_pdf():
         return jsonify({"error": "No file or file URL provided"}), 400
     
     if file:
-        if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
-        
-        if not file or not file.filename.endswith('.pdf'):
-            return jsonify({"error": "Invalid file format, only PDF allowed"}), 400
-        
         return await process_file(file)
 
     elif file_url:
         return await process_file_url(file_url)
 
 
-@app.route("/progress/<int:task_id>", methods=["GET"])
+@app.route("/api/progress/<int:task_id>", methods=["GET"])
 async def get_progress(task_id):
     progress = await get_task_progress(task_id)
     if progress is None:
         return jsonify({"error": "Task not found or not started yet"}), 404
     return jsonify(progress), 200
 
-@app.route("/search", methods=["POST"])
+
+@app.route("/api/search", methods=["POST"])
 @cache_response()
 async def search():
     data = await request.json
@@ -64,6 +59,12 @@ async def search():
     
     results = await process_query(user_query)
     return jsonify({"results": results}), 200
+
+
+@app.after_serving
+async def on_startup():
+    await close_connection()
+
 
 if __name__ == "__main__":
     app.run(debug=True)

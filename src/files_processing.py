@@ -17,9 +17,8 @@ async def is_file_already_uploaded(file, filename):
     file_hash = md5_hash.hexdigest()
 
     filename_redis = await check_file(file_hash, filename)
-    if filename_redis is not None: 
+    if filename_redis: 
         return jsonify({"error": "File has already been uploaded"}), 409
-    return None
 
 async def process_file(file):
     filename = file.filename

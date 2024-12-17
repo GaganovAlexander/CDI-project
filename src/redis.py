@@ -28,7 +28,6 @@ async def get_task_progress(task_id: int):
     last_task_id = await get_last_task_id()
     if task_id <= last_task_id:
         return {"pdf_parsing_progress": 100, "adding_doc_to_elastic_progress": 100}
-    return None
 
 async def delete_task_progress(task_id: int) -> None:
     await redis_client.delete(f"task:{task_id}:progress")
@@ -36,5 +35,9 @@ async def delete_task_progress(task_id: int) -> None:
 async def check_file(hash: str, filename: str) -> str:
     filename_redis = await redis_client.get(f"file:{hash}")
     if filename_redis:
-        return filename_redis
+        return True
     await redis_client.set(f"file:{hash}", filename)
+    return False
+
+async def close_connection():
+    await redis_client.close()
